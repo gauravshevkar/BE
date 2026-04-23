@@ -697,20 +697,26 @@ const viewDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
     const collegeId = req.user.id;
-
     const document = await Document.findOne({ _id: documentId, collegeId });
-    if (!document) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-
-    // Check if file exists
-    const fs = require('fs');
-    if (!fs.existsSync(document.filePath)) {
+    if (!document) return res.status(404).json({ error: 'Document not found' });
+    const fsSync = require('fs');
+    if (!fsSync.existsSync(document.filePath)) {
       return res.status(404).json({ error: 'File not found on server' });
     }
-
-    // Send file
-    res.sendFile(document.filePath, { root: '/' });
+    const fileName = document.fileName || path.basename(document.filePath);
+    const fileExtension = path.extname(fileName).toLowerCase();
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    const contentType = contentTypes[fileExtension] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    res.sendFile(path.resolve(document.filePath));
   } catch (error) {
     console.error('View document error:', error);
     res.status(500).json({ error: 'Server error viewing document' });
